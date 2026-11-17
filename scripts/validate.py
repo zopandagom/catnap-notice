@@ -26,8 +26,9 @@ IMAGE_MAX_PIXELS = 2048  # 앱 NoticeImage.maxPixelLength (긴 변)
 
 LANGUAGES = ["ko", "en", "ja", "zh-Hans", "zh-Hant", "fr", "es", "de", "pt-BR", "it"]  # 앱 AppLanguage
 NOTICE_KEYS = {"id", "type", "startsAt", "endsAt", "minAppVersion", "maxAppVersion", "actionLink", "localizations"}
-# 강제 업데이트 항목(`"type": "forceUpdate"`). min/maxAppVersion 은 forceUpdateVersion 과 헷갈려 쓰지 않는다.
-FORCE_KEYS = {"id", "type", "forceUpdateVersion", "appStoreURL", "startsAt", "endsAt", "localizations"}
+# 강제 업데이트 항목(`"type": "forceUpdate"`). 앱은 기간·버전 범위를 보지 않고 버전이 낮으면 무조건 띄우므로
+# startsAt·endsAt·min/maxAppVersion 은 쓰지 않는다(써도 앱이 무시해 헷갈린다).
+FORCE_KEYS = {"id", "type", "forceUpdateVersion", "appStoreURL", "localizations"}
 FORCE_BLOCK_KEYS = {"text", "actionTitle"}
 TYPES = ("notice", "forceUpdate")
 BLOCK_KEYS = {"text", "image", "imageDescription", "confirmTitle", "actionTitle"}
@@ -42,7 +43,7 @@ REQUIRED_LANGUAGES = ["ko", "en"]  # ko: 앱이 마지막에 고르는 언어, e
 # 출시하면 여기에 넣는다: 그 뒤로는 App Store 에 아직 없는 버전으로 강제 업데이트를 걸 수 없다.
 APP_STORE_ID = ""
 LOOKUP_URL = "https://itunes.apple.com/lookup?id={id}&country=kr"
-APP_STORE_PATH = re.compile(r"^/(?:app|[a-z]{2}/app/[A-Za-z0-9%._~-]+)/id([0-9]+)$")
+APP_STORE_PATH = re.compile(r"^/(?:[a-z]{2}/)?app/(?:[A-Za-z0-9%._~-]+/)?id([0-9]+)$")
 
 errors: list[str] = []
 warnings: list[str] = []
