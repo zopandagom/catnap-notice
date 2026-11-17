@@ -1,17 +1,21 @@
 {
   "notices": [
     {
-      "id": "test-2026-11-17",
+      "id": "test-2026-11-17-image",
       "endsAt": "2026-12-01T00:00:00+09:00",
       "actionLink": "https://github.com/zopandagom/catnap-notice",
       "localizations": {
         "ko": {
-          "text": "공지 팝업 테스트예요. 이 공지는 12월 1일에 저절로 사라져요.",
+          "text": "그림이 있는 공지 팝업 테스트예요. 모서리 점 네 개가 모두 보이면 그림이 잘리지 않은 거예요.",
+          "image": "https://zopandagom.github.io/catnap-notice/images/test-1200x800.png",
+          "imageDescription": "테스트 그림, 가로 1200 세로 800",
           "confirmTitle": "알겠어요",
           "actionTitle": "공지 레포 보기"
         },
         "en": {
-          "text": "This is a test notice. It disappears on December 1.",
+          "text": "This is a test notice with an image. If you can see all four corner dots, the image is not cropped.",
+          "image": "https://zopandagom.github.io/catnap-notice/images/test-1200x800.png",
+          "imageDescription": "Test image, 1200 by 800",
           "actionTitle": "View notice repo"
         }
       }
