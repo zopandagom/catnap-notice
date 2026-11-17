@@ -11,7 +11,7 @@ import struct
 import sys
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
 # 이 레포가 GitHub Pages 로 나가는 주소. 그림 주소가 이 아래면 레포 안 파일을 찾아 크기를 본다.
@@ -27,6 +27,10 @@ BLOCK_KEYS = {"text", "image", "imageDescription", "confirmTitle", "actionTitle"
 # 앱의 ISO8601DateFormatter 기본 형식: 초까지, 시간대(Z 또는 +09:00) 필수, 소수 초 없음.
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$")
 VERSION_PATTERN = re.compile(r"^\d+(\.\d+)*$")
+# 추가 버튼 링크: 이 접두어 뒤의 퍼센트 인코딩된 https 주소는 앱 안 브라우저, 그 밖은 앱 밖에서 연다.
+APP_SCHEME = "catnap"
+INTERNAL_PREFIX = f"{APP_SCHEME}://internal-url="
+REQUIRED_LANGUAGES = ["ko", "en"]  # ko: 앱이 마지막에 고르는 언어, en: 지원하지 않는 언어 기기가 보는 언어
 
 errors: list[str] = []
 
@@ -109,6 +113,35 @@ def check_image(where: str, value: str) -> None:
         error(where, f"그림 긴 변이 {IMAGE_MAX_PIXELS}px 를 넘습니다 ({size[0]}x{size[1]}): {path.relative_to(ROOT)}")
 
 
+def check_link(where: str, value) -> None:
+    """앱 규칙(냥자리 Core `LinkDestination`): `catnap://internal-url=<완전히 인코딩한 https 주소>` 는 앱 안 브라우저,
+    https·itms-apps(host 있음)·mailto(주소 있음)는 앱 밖에서 연다. 그 밖은 앱이 팝업만 닫으므로 여기서 막는다."""
+    if not non_empty(value):
+        error(where, "비어 있지 않은 문자열이어야 합니다")
+        return
+    if value != value.strip() or re.search(r"\s", value):
+        error(where, f"공백이 섞이면 앱이 열지 않습니다: {value!r}")
+        return
+    if value.startswith(INTERNAL_PREFIX):
+        encoded = value[len(INTERNAL_PREFIX) :]
+        # quote(주소, safe="") 결과만 받는다. 인코딩하지 않은 문자가 섞인 형태는 앱이 지원하지 않는다.
+        if not re.fullmatch(r"[A-Za-z0-9._~%-]+", encoded) or not is_https(unquote(encoded)):
+            error(where, f"internal-url= 뒤에는 퍼센트 인코딩한 https 주소가 와야 합니다: {value!r}")
+        return
+    url = urlparse(value)
+    scheme = url.scheme.lower()
+    if scheme == APP_SCHEME:
+        error(where, f"{APP_SCHEME}:// 링크는 internal-url= 형태만 씁니다. 그 밖은 앱이 무시합니다: {value!r}")
+    elif scheme in ("https", "itms-apps"):
+        if not url.hostname:
+            error(where, f"주소에 host 가 없습니다: {value!r}")
+    elif scheme == "mailto":
+        if not url.path:
+            error(where, f"mailto: 뒤에 메일 주소가 없습니다: {value!r}")
+    else:
+        error(where, f"앱이 여는 링크는 catnap://internal-url=…·https·itms-apps·mailto 뿐입니다: {value!r}")
+
+
 def check_block(where: str, block, has_link: bool) -> None:
     if not isinstance(block, dict):
         error(where, "언어 블록은 객체여야 합니다")
@@ -159,8 +192,8 @@ def check_notice(index: int, notice, seen_ids: set[str]) -> None:
         error(where, "minAppVersion 이 maxAppVersion 보다 큽니다")
 
     has_link = "actionLink" in notice
-    if has_link and (not isinstance(notice["actionLink"], str) or not is_https(notice["actionLink"])):
-        error(f"{where}.actionLink", f"https 주소여야 합니다: {notice['actionLink']!r}")
+    if has_link:
+        check_link(f"{where}.actionLink", notice["actionLink"])
 
     blocks = notice.get("localizations")
     if not isinstance(blocks, dict) or not blocks:
@@ -168,8 +201,9 @@ def check_notice(index: int, notice, seen_ids: set[str]) -> None:
         return
     for key in blocks.keys() - set(LANGUAGES):
         error(where, f"모르는 언어 {key!r} (쓸 수 있는 언어: {', '.join(LANGUAGES)})")
-    if "ko" not in blocks:
-        error(where, "ko 블록은 꼭 있어야 합니다 (앱이 마지막에 고르는 언어)")
+    for language in REQUIRED_LANGUAGES:
+        if language not in blocks:
+            error(where, f"{language} 블록은 꼭 있어야 합니다 (ko·en 필수)")
     for language in LANGUAGES:
         if language in blocks:
             check_block(f"{where}.localizations.{language}", blocks[language], has_link)

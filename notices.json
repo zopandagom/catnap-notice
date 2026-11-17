@@ -1,22 +1,37 @@
 {
   "notices": [
     {
-      "id": "test-2026-11-17-image",
+      "id": "test-2026-11-17-internal",
+      "endsAt": "2026-12-01T00:00:00+09:00",
+      "actionLink": "catnap://internal-url=https%3A%2F%2Fgithub.com%2Fzopandagom%2Fcatnap-notice",
+      "localizations": {
+        "ko": {
+          "text": "앱 안 브라우저 링크 테스트예요. 아래 버튼을 누르면 앱 안에서 공지 레포가 열려요.",
+          "image": "https://zopandagom.github.io/catnap-notice/images/test-1200x800.png",
+          "imageDescription": "테스트 그림, 가로 1200 세로 800",
+          "confirmTitle": "알겠어요",
+          "actionTitle": "앱 안에서 열기"
+        },
+        "en": {
+          "text": "In-app browser link test. Tap the button below to open the notice repo inside the app.",
+          "image": "https://zopandagom.github.io/catnap-notice/images/test-1200x800.png",
+          "imageDescription": "Test image, 1200 by 800",
+          "actionTitle": "Open in app"
+        }
+      }
+    },
+    {
+      "id": "test-2026-11-17-external",
       "endsAt": "2026-12-01T00:00:00+09:00",
       "actionLink": "https://github.com/zopandagom/catnap-notice",
       "localizations": {
         "ko": {
-          "text": "그림이 있는 공지 팝업 테스트예요. 모서리 점 네 개가 모두 보이면 그림이 잘리지 않은 거예요.",
-          "image": "https://zopandagom.github.io/catnap-notice/images/test-1200x800.png",
-          "imageDescription": "테스트 그림, 가로 1200 세로 800",
-          "confirmTitle": "알겠어요",
-          "actionTitle": "공지 레포 보기"
+          "text": "외부 링크 테스트예요. 아래 버튼을 누르면 Safari 앱에서 공지 레포가 열려요.",
+          "actionTitle": "Safari 에서 열기"
         },
         "en": {
-          "text": "This is a test notice with an image. If you can see all four corner dots, the image is not cropped.",
-          "image": "https://zopandagom.github.io/catnap-notice/images/test-1200x800.png",
-          "imageDescription": "Test image, 1200 by 800",
-          "actionTitle": "View notice repo"
+          "text": "External link test. Tap the button below to open the notice repo in Safari.",
+          "actionTitle": "Open in Safari"
         }
       }
     }
