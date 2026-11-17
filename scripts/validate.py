@@ -5,6 +5,8 @@
 모르는 키(오타)까지 오류로 잡는다. 사용법: python3 scripts/validate.py [notices.json]
 """
 
+from __future__ import annotations
+
 import json
 import re
 import struct
@@ -12,6 +14,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
 # 이 레포가 GitHub Pages 로 나가는 주소. 그림 주소가 이 아래면 레포 안 파일을 찾아 크기를 본다.
@@ -22,17 +25,29 @@ IMAGE_BYTE_LIMIT = 2 * 1024 * 1024  # 앱 NoticeClientImpl.imageByteLimit
 IMAGE_MAX_PIXELS = 2048  # 앱 NoticeImage.maxPixelLength (긴 변)
 
 LANGUAGES = ["ko", "en", "ja", "zh-Hans", "zh-Hant", "fr", "es", "de", "pt-BR", "it"]  # 앱 AppLanguage
-NOTICE_KEYS = {"id", "startsAt", "endsAt", "minAppVersion", "maxAppVersion", "actionLink", "localizations"}
+NOTICE_KEYS = {"id", "type", "startsAt", "endsAt", "minAppVersion", "maxAppVersion", "actionLink", "localizations"}
+# 강제 업데이트 항목(`"type": "forceUpdate"`). min/maxAppVersion 은 forceUpdateVersion 과 헷갈려 쓰지 않는다.
+FORCE_KEYS = {"id", "type", "forceUpdateVersion", "appStoreURL", "startsAt", "endsAt", "localizations"}
+FORCE_BLOCK_KEYS = {"text", "actionTitle"}
+TYPES = ("notice", "forceUpdate")
 BLOCK_KEYS = {"text", "image", "imageDescription", "confirmTitle", "actionTitle"}
 # 앱의 ISO8601DateFormatter 기본 형식: 초까지, 시간대(Z 또는 +09:00) 필수, 소수 초 없음.
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$")
 VERSION_PATTERN = re.compile(r"^\d+(\.\d+)*$")
 # 추가 버튼 링크: 이 접두어 뒤의 퍼센트 인코딩된 https 주소는 앱 안 브라우저, 그 밖은 앱 밖에서 연다.
-APP_SCHEME = "catnap"
+APP_SCHEME = "catnap-pandagom"
 INTERNAL_PREFIX = f"{APP_SCHEME}://internal-url="
 REQUIRED_LANGUAGES = ["ko", "en"]  # ko: 앱이 마지막에 고르는 언어, en: 지원하지 않는 언어 기기가 보는 언어
+# 냥자리의 App Store 앱 ID(숫자). 비어 있으면(출시 전) App Store 버전·앱 ID 검사를 건너뛰고 형식만 본다.
+# 출시하면 여기에 넣는다: 그 뒤로는 App Store 에 아직 없는 버전으로 강제 업데이트를 걸 수 없다.
+APP_STORE_ID = ""
+LOOKUP_URL = "https://itunes.apple.com/lookup?id={id}&country=kr"
+APP_STORE_PATH = re.compile(r"^/(?:app|[a-z]{2}/app/[A-Za-z0-9%._~-]+)/id([0-9]+)$")
 
 errors: list[str] = []
+warnings: list[str] = []
+# 강제 업데이트 항목: (where, forceUpdateVersion 숫자 목록, 원문, App Store URL 의 앱 ID)
+force_updates: list[tuple[str, list[int] | None, str, str | None]] = []
 
 
 def error(where: str, message: str) -> None:
@@ -114,7 +129,7 @@ def check_image(where: str, value: str) -> None:
 
 
 def check_link(where: str, value) -> None:
-    """앱 규칙(냥자리 Core `LinkDestination`): `catnap://internal-url=<완전히 인코딩한 https 주소>` 는 앱 안 브라우저,
+    """앱 규칙(냥자리 Core `LinkDestination`): `catnap-pandagom://internal-url=<완전히 인코딩한 https 주소>` 는 앱 안 브라우저,
     https·itms-apps(host 있음)·mailto(주소 있음)는 앱 밖에서 연다. 그 밖은 앱이 팝업만 닫으므로 여기서 막는다."""
     if not non_empty(value):
         error(where, "비어 있지 않은 문자열이어야 합니다")
@@ -139,7 +154,7 @@ def check_link(where: str, value) -> None:
         if not url.path:
             error(where, f"mailto: 뒤에 메일 주소가 없습니다: {value!r}")
     else:
-        error(where, f"앱이 여는 링크는 catnap://internal-url=…·https·itms-apps·mailto 뿐입니다: {value!r}")
+        error(where, f"앱이 여는 링크는 catnap-pandagom://internal-url=…·https·itms-apps·mailto 뿐입니다: {value!r}")
 
 
 def check_block(where: str, block, has_link: bool) -> None:
@@ -164,13 +179,49 @@ def check_block(where: str, block, has_link: bool) -> None:
         error(where, "공지에 actionLink 가 있는데 이 언어에 actionTitle 이 없어 버튼이 안 보입니다")
 
 
+def check_app_store_url(where: str, value) -> str | None:
+    """강제 업데이트 버튼 링크. 앱 검사(scheme·host·user/port·마지막 조각 id+숫자)보다 엄격하다. 앱 ID 를 돌려준다."""
+    if not non_empty(value):
+        error(where, "appStoreURL 은 비어 있지 않은 문자열이어야 합니다")
+        return None
+    url = urlparse(value)
+    match = APP_STORE_PATH.match(url.path)
+    if (
+        url.scheme not in ("itms-apps", "https")
+        or url.netloc != "apps.apple.com"
+        or url.params or url.query or url.fragment
+        or not match
+    ):
+        error(where, "itms-apps://apps.apple.com/app/id<숫자> 형식이어야 합니다 "
+              f"(또는 https, /kr/app/<이름>/id<숫자>. 쿼리·포트 없음): {value!r}")
+        return None
+    return match.group(1)
+
+
+def check_force_block(where: str, block) -> None:
+    if not isinstance(block, dict):
+        error(where, "언어 블록은 객체여야 합니다")
+        return
+    for key in block.keys() - FORCE_BLOCK_KEYS:
+        error(where, f"강제 업데이트에 쓰지 않는 키 {key!r} (쓸 수 있는 키: {', '.join(sorted(FORCE_BLOCK_KEYS))})")
+    if not non_empty(block.get("text")):
+        error(where, "강제 업데이트 안내 text 는 꼭 있어야 합니다")
+    if "actionTitle" in block and not non_empty(block["actionTitle"]):
+        error(where, "actionTitle 은 비어 있지 않은 문자열이어야 합니다 (없으면 앱 기본 \"업데이트\")")
+
+
 def check_notice(index: int, notice, seen_ids: set[str]) -> None:
     where = f"notices[{index}]"
     if not isinstance(notice, dict):
         error(where, "공지는 객체여야 합니다")
         return
-    for key in notice.keys() - NOTICE_KEYS:
-        error(where, f"모르는 키 {key!r} (쓸 수 있는 키: {', '.join(sorted(NOTICE_KEYS))})")
+    kind = notice.get("type", "notice")
+    if kind not in TYPES:
+        error(where, f"type 은 {' 또는 '.join(TYPES)} 이어야 합니다 (없으면 notice): {kind!r}")
+        return
+    allowed = FORCE_KEYS if kind == "forceUpdate" else NOTICE_KEYS
+    for key in notice.keys() - allowed:
+        error(where, f"{kind} 에 쓰지 않는 키 {key!r} (쓸 수 있는 키: {', '.join(sorted(allowed))})")
 
     notice_id = notice.get("id")
     if not non_empty(notice_id):
@@ -185,6 +236,10 @@ def check_notice(index: int, notice, seen_ids: set[str]) -> None:
     ends = parse_date(f"{where}.endsAt", notice["endsAt"]) if "endsAt" in notice else None
     if starts and ends and starts >= ends:
         error(where, "startsAt 은 endsAt 보다 앞이어야 합니다")
+
+    if kind == "forceUpdate":
+        check_force_update(where, notice)
+        return
 
     low = parse_version(f"{where}.minAppVersion", notice["minAppVersion"]) if "minAppVersion" in notice else None
     high = parse_version(f"{where}.maxAppVersion", notice["maxAppVersion"]) if "maxAppVersion" in notice else None
@@ -209,6 +264,55 @@ def check_notice(index: int, notice, seen_ids: set[str]) -> None:
             check_block(f"{where}.localizations.{language}", blocks[language], has_link)
 
 
+def check_force_update(where: str, notice) -> None:
+    version = None
+    if "forceUpdateVersion" not in notice:
+        error(where, "forceUpdateVersion 은 꼭 있어야 합니다")
+    else:
+        version = parse_version(f"{where}.forceUpdateVersion", notice["forceUpdateVersion"])
+    app_id = check_app_store_url(f"{where}.appStoreURL", notice.get("appStoreURL"))
+    force_updates.append((where, version, str(notice.get("forceUpdateVersion")), app_id))
+
+    blocks = notice.get("localizations")
+    if not isinstance(blocks, dict) or not blocks:
+        error(where, "localizations 는 언어별 블록이 든 객체여야 합니다")
+        return
+    for key in blocks.keys() - set(LANGUAGES):
+        error(where, f"모르는 언어 {key!r} (쓸 수 있는 언어: {', '.join(LANGUAGES)})")
+    for language in REQUIRED_LANGUAGES:
+        if language not in blocks:
+            error(where, f"{language} 블록은 꼭 있어야 합니다 (ko·en 필수)")
+    for language in LANGUAGES:
+        if language in blocks:
+            check_force_block(f"{where}.localizations.{language}", blocks[language])
+
+
+def check_force_updates_against_store() -> None:
+    """강제 업데이트는 많아야 1개. 앱 ID 가 있으면 App Store 에 실제로 나온 버전 이하이고 앱 ID 가 같아야 한다."""
+    if len(force_updates) > 1:
+        error("notices", f"강제 업데이트 항목은 하나만 둡니다 ({len(force_updates)}개)")
+    if not force_updates:
+        return
+    if not APP_STORE_ID:
+        warnings.append("앱 ID 미설정(APP_STORE_ID): App Store 버전·앱 ID 검사를 건너뜀 (출시 전 테스트용)")
+        return
+    try:
+        request = Request(LOOKUP_URL.format(id=APP_STORE_ID), headers={"User-Agent": "catnap-notice-ci"})
+        with urlopen(request, timeout=20) as response:
+            results = json.load(response).get("results", [])
+        store_version = results[0]["version"]
+    except Exception as exception:  # 조회 실패도 머지를 막는다 (확인 못 한 버전으로 가두지 않게)
+        error("App Store", f"앱 {APP_STORE_ID} 의 버전을 조회하지 못했습니다: {exception}")
+        return
+    store = [int(part) for part in store_version.split(".")] if VERSION_PATTERN.match(store_version) else None
+    for where, version, raw, app_id in force_updates:
+        if app_id is not None and app_id != APP_STORE_ID:
+            error(f"{where}.appStoreURL", f"앱 ID 가 냥자리({APP_STORE_ID})가 아닙니다: id{app_id}")
+        if version is not None and (store is None or version_less(store, version)):
+            error(f"{where}.forceUpdateVersion",
+                  f"App Store 에 나온 버전({store_version})보다 높습니다: {raw}. 모든 사용자가 갇힙니다")
+
+
 def main() -> int:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "notices.json"
     raw = path.read_bytes()
@@ -229,6 +333,10 @@ def main() -> int:
             seen_ids: set[str] = set()
             for index, notice in enumerate(feed["notices"]):
                 check_notice(index, notice, seen_ids)
+            check_force_updates_against_store()
+
+    for line in warnings:
+        print(f"WARN: {line}")
 
     if errors:
         print(f"FAIL: {path.name} 에 문제 {len(errors)}개", file=sys.stderr)
