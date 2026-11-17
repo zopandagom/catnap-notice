@@ -14,7 +14,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote, urlparse
-from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
 # 이 레포가 GitHub Pages 로 나가는 주소. 그림 주소가 이 아래면 레포 안 파일을 찾아 크기를 본다.
@@ -28,7 +27,7 @@ LANGUAGES = ["ko", "en", "ja", "zh-Hans", "zh-Hant", "fr", "es", "de", "pt-BR", 
 NOTICE_KEYS = {"id", "type", "startsAt", "endsAt", "minAppVersion", "maxAppVersion", "actionLink", "localizations"}
 # 강제 업데이트 항목(`"type": "forceUpdate"`). 앱은 기간·버전 범위를 보지 않고 버전이 낮으면 무조건 띄우므로
 # startsAt·endsAt·min/maxAppVersion 은 쓰지 않는다(써도 앱이 무시해 헷갈린다).
-FORCE_KEYS = {"id", "type", "forceUpdateVersion", "appStoreURL", "localizations"}
+FORCE_KEYS = {"id", "type", "forceUpdateBuildNumber", "appStoreURL", "localizations"}
 FORCE_BLOCK_KEYS = {"text", "actionTitle"}
 TYPES = ("notice", "forceUpdate")
 BLOCK_KEYS = {"text", "image", "imageDescription", "confirmTitle", "actionTitle"}
@@ -39,16 +38,18 @@ VERSION_PATTERN = re.compile(r"^\d+(\.\d+)*$")
 APP_SCHEME = "catnap-pandagom"
 INTERNAL_PREFIX = f"{APP_SCHEME}://internal-url="
 REQUIRED_LANGUAGES = ["ko", "en"]  # ko: 앱이 마지막에 고르는 언어, en: 지원하지 않는 언어 기기가 보는 언어
-# 냥자리의 App Store 앱 ID(숫자). 비어 있으면(출시 전) App Store 버전·앱 ID 검사를 건너뛰고 형식만 본다.
-# 출시하면 여기에 넣는다: 그 뒤로는 App Store 에 아직 없는 버전으로 강제 업데이트를 걸 수 없다.
+# 냥자리의 App Store 앱 ID(숫자). 설정하면 appStoreURL 의 id 가 이것과 같아야 한다. 비어 있으면(출시 전) 보지 않는다.
 APP_STORE_ID = ""
-LOOKUP_URL = "https://itunes.apple.com/lookup?id={id}&country=kr"
+# App Store 에 나온 가장 높은 냥자리 빌드 번호(CFBundleVersion, 정수). 새 빌드가 App Store 에 나오면 올린다.
+# 설정하면 forceUpdateBuildNumber 가 이보다 클 수 없다(아직 나오지 않은 빌드로 모든 사용자를 가두지 않게).
+# App Store 조회(iTunes lookup)는 빌드 번호를 알려 주지 않아 손으로 적는다. None 이면(출시 전) 보지 않는다.
+RELEASED_BUILD_NUMBER: int | None = None
 APP_STORE_PATH = re.compile(r"^/(?:[a-z]{2}/)?app/(?:[A-Za-z0-9%._~-]+/)?id([0-9]+)$")
 
 errors: list[str] = []
 warnings: list[str] = []
-# 강제 업데이트 항목: (where, forceUpdateVersion 숫자 목록, 원문, App Store URL 의 앱 ID)
-force_updates: list[tuple[str, list[int] | None, str, str | None]] = []
+# 강제 업데이트 항목: (where, forceUpdateBuildNumber, App Store URL 의 앱 ID)
+force_updates: list[tuple[str, int | None, str | None]] = []
 
 
 def error(where: str, message: str) -> None:
@@ -266,13 +267,17 @@ def check_notice(index: int, notice, seen_ids: set[str]) -> None:
 
 
 def check_force_update(where: str, notice) -> None:
-    version = None
-    if "forceUpdateVersion" not in notice:
-        error(where, "forceUpdateVersion 은 꼭 있어야 합니다")
+    build = None
+    value = notice.get("forceUpdateBuildNumber")
+    if "forceUpdateBuildNumber" not in notice:
+        error(where, "forceUpdateBuildNumber 는 꼭 있어야 합니다")
+    elif isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        # 앱은 JSON 정수만 받는다("12" 같은 문자열·12.5·0 이하는 그 항목을 뺀다).
+        error(f"{where}.forceUpdateBuildNumber", f"1 이상 정수(따옴표 없이)여야 합니다: {value!r}")
     else:
-        version = parse_version(f"{where}.forceUpdateVersion", notice["forceUpdateVersion"])
+        build = value
     app_id = check_app_store_url(f"{where}.appStoreURL", notice.get("appStoreURL"))
-    force_updates.append((where, version, str(notice.get("forceUpdateVersion")), app_id))
+    force_updates.append((where, build, app_id))
 
     blocks = notice.get("localizations")
     if not isinstance(blocks, dict) or not blocks:
@@ -289,29 +294,21 @@ def check_force_update(where: str, notice) -> None:
 
 
 def check_force_updates_against_store() -> None:
-    """강제 업데이트는 많아야 1개. 앱 ID 가 있으면 App Store 에 실제로 나온 버전 이하이고 앱 ID 가 같아야 한다."""
+    """강제 업데이트는 많아야 1개. 설정돼 있으면 앱 ID 가 냥자리이고 빌드 번호가 출시된 빌드 이하여야 한다."""
     if len(force_updates) > 1:
         error("notices", f"강제 업데이트 항목은 하나만 둡니다 ({len(force_updates)}개)")
     if not force_updates:
         return
     if not APP_STORE_ID:
-        warnings.append("앱 ID 미설정(APP_STORE_ID): App Store 버전·앱 ID 검사를 건너뜀 (출시 전 테스트용)")
-        return
-    try:
-        request = Request(LOOKUP_URL.format(id=APP_STORE_ID), headers={"User-Agent": "catnap-notice-ci"})
-        with urlopen(request, timeout=20) as response:
-            results = json.load(response).get("results", [])
-        store_version = results[0]["version"]
-    except Exception as exception:  # 조회 실패도 머지를 막는다 (확인 못 한 버전으로 가두지 않게)
-        error("App Store", f"앱 {APP_STORE_ID} 의 버전을 조회하지 못했습니다: {exception}")
-        return
-    store = [int(part) for part in store_version.split(".")] if VERSION_PATTERN.match(store_version) else None
-    for where, version, raw, app_id in force_updates:
-        if app_id is not None and app_id != APP_STORE_ID:
+        warnings.append("앱 ID 미설정(APP_STORE_ID): appStoreURL 의 앱 ID 검사를 건너뜀 (출시 전 테스트용)")
+    if RELEASED_BUILD_NUMBER is None:
+        warnings.append("출시 빌드 미설정(RELEASED_BUILD_NUMBER): 빌드 번호 상한 검사를 건너뜀 (출시 전 테스트용)")
+    for where, build, app_id in force_updates:
+        if APP_STORE_ID and app_id is not None and app_id != APP_STORE_ID:
             error(f"{where}.appStoreURL", f"앱 ID 가 냥자리({APP_STORE_ID})가 아닙니다: id{app_id}")
-        if version is not None and (store is None or version_less(store, version)):
-            error(f"{where}.forceUpdateVersion",
-                  f"App Store 에 나온 버전({store_version})보다 높습니다: {raw}. 모든 사용자가 갇힙니다")
+        if RELEASED_BUILD_NUMBER is not None and build is not None and build > RELEASED_BUILD_NUMBER:
+            error(f"{where}.forceUpdateBuildNumber",
+                  f"App Store 에 나온 빌드({RELEASED_BUILD_NUMBER})보다 큽니다: {build}. 모든 사용자가 갇힙니다")
 
 
 def main() -> int:

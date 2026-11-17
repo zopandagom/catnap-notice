@@ -88,9 +88,9 @@ CI 는 앱보다 엄격하다: 앱은 잘못된 공지를 조용히 빼지만, C
 
 ```json
 {
-  "id": "force-1.2",
+  "id": "force-build-12",
   "type": "forceUpdate",
-  "forceUpdateVersion": "1.2",
+  "forceUpdateBuildNumber": 12,
   "appStoreURL": "itms-apps://apps.apple.com/app/id1234567890",
   "localizations": {
     "ko": { "text": "새 버전이 나왔어요. 업데이트한 뒤 계속 즐겨 주세요.", "actionTitle": "업데이트" },
@@ -101,14 +101,14 @@ CI 는 앱보다 엄격하다: 앱은 잘못된 공지를 조용히 빼지만, C
 
 | 키 | 필수 | 설명 |
 |---|---|---|
-| `forceUpdateVersion` | ✅ | 앱 버전이 이보다 **낮으면** 팝업을 띄운다. `1.2.3` 형식(`1.0` = `1.0.0`) |
+| `forceUpdateBuildNumber` | ✅ | 앱 **빌드 번호**(`CFBundleVersion`)가 이보다 **낮으면** 팝업을 띄운다. 1 이상 정수, 따옴표 없이(`12`. `"12"`·`12.5` 는 틀림). 앱 버전(`1.2` 같은 마케팅 버전)은 보지 않는다 |
 | `appStoreURL` | ✅ | 버튼을 누르면 앱 밖에서 여는 App Store 주소. `itms-apps://apps.apple.com/app/id<숫자>` 또는 `https://apps.apple.com/kr/app/id<숫자>`(`/kr/app/<이름>/id<숫자>` 도 된다). 쿼리·포트 없음 |
 | `localizations` | ✅ | `ko`·`en` 필수. 블록에는 `text`(필수)·`actionTitle`(선택, 없으면 앱 기본 "업데이트")만 쓴다 |
 
-`startsAt`·`endsAt`·`minAppVersion`·`maxAppVersion`·`actionLink`·`image`·`confirmTitle` 은 쓰지 않는다(CI 가 막는다). 강제 업데이트는 기간과 상관없이 앱 버전이 `forceUpdateVersion` 보다 낮으면 **무조건** 뜬다.
+`startsAt`·`endsAt`·`minAppVersion`·`maxAppVersion`·`actionLink`·`image`·`confirmTitle` 은 쓰지 않는다(CI 가 막는다). 강제 업데이트는 기간·앱 버전과 상관없이 앱 빌드 번호가 `forceUpdateBuildNumber` 보다 낮으면 **무조건** 뜬다. 냥자리는 빌드 번호를 버전이 바뀌어도 정수로 이어서 올린다(예: 1.0 은 빌드 1, 1.1 은 빌드 2).
 
 앱 동작:
-- 버전이 낮은 앱은 **매 실행** 닫을 수 없는 팝업을 띄운다(본 공지 기억과 무관). 버튼은 App Store 로 가고, 업데이트하지 않고 돌아오면 팝업이 그대로 있다.
+- 빌드 번호가 낮은 앱은 **매 실행** 닫을 수 없는 팝업을 띄운다(본 공지 기억과 무관). 버튼은 App Store 로 가고, 업데이트하지 않고 돌아오면 팝업이 그대로 있다.
 - 강제 업데이트가 뜨는 앱에는 같은 파일의 일반 공지가 보이지 않는다. 첫 실행에도 뜬다(받기가 튜토리얼보다 먼저 끝나면 튜토리얼 대신, 늦으면 튜토리얼을 마친 뒤).
 - 판을 푸는 중이면 판을 닫거나 깨고 목록으로 돌아올 때 뜬다. 구매 창·설정 같은 창이 떠 있으면 닫힐 때 뜬다.
 - 앱을 새로 켤 때만 받으므로, 백그라운드에 있던 앱은 다음에 새로 켤 때 뜬다. 오프라인이면 뜨지 않는다.
@@ -116,5 +116,6 @@ CI 는 앱보다 엄격하다: 앱은 잘못된 공지를 조용히 빼지만, C
 
 CI 가 막는 것:
 - 강제 업데이트 항목은 하나만 둔다.
-- `scripts/validate.py` 의 `APP_STORE_ID` 가 설정되어 있으면, App Store 에 실제로 나온 버전(iTunes lookup, 한국 스토어)보다 높은 `forceUpdateVersion`, 냥자리가 아닌 앱 ID 를 막는다. **App Store 에 새 버전이 나온 뒤에만 강제 업데이트를 올릴 수 있다.**
-- `APP_STORE_ID` 가 비어 있으면(출시 전) 이 검사를 건너뛰고 형식만 본다(경고만 남긴다). 테스트용 강제 업데이트는 형식에 맞는 가짜 id(예: `id1234567890`)를 쓰고, 출시 전에 지운다. **출시하면 `APP_STORE_ID` 를 꼭 넣는다.**
+- `scripts/validate.py` 의 `RELEASED_BUILD_NUMBER`(App Store 에 나온 가장 높은 빌드 번호)가 설정되어 있으면 그보다 큰 `forceUpdateBuildNumber` 를 막는다. **App Store 에 새 빌드가 나오면 먼저 `RELEASED_BUILD_NUMBER` 를 올리고, 그다음에 강제 업데이트를 올린다.** App Store 조회(iTunes lookup)는 빌드 번호를 알려 주지 않아 손으로 적는다.
+- `APP_STORE_ID` 가 설정되어 있으면 냥자리가 아닌 앱 ID 의 `appStoreURL` 을 막는다.
+- 둘 다 비어 있으면(출시 전) 이 검사를 건너뛰고 형식만 본다(경고만 남긴다). 테스트용 강제 업데이트는 출시 전에 지운다. **출시하면 `APP_STORE_ID`·`RELEASED_BUILD_NUMBER` 를 꼭 넣는다.**

@@ -1,9 +1,9 @@
 {
   "notices": [
     {
-      "id": "test-force-update-1.0.1",
+      "id": "test-force-update-build-2",
       "type": "forceUpdate",
-      "forceUpdateVersion": "1.0.1",
+      "forceUpdateBuildNumber": 2,
       "appStoreURL": "https://apps.apple.com/kr/app/id6829718440",
       "localizations": {
         "ko": {
