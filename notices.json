@@ -1,3 +1,20 @@
 {
-  "notices": []
+  "notices": [
+    {
+      "id": "test-2026-11-17",
+      "endsAt": "2026-12-01T00:00:00+09:00",
+      "actionLink": "https://github.com/zopandagom/catnap-notice",
+      "localizations": {
+        "ko": {
+          "text": "공지 팝업 테스트예요. 이 공지는 12월 1일에 저절로 사라져요.",
+          "confirmTitle": "알겠어요",
+          "actionTitle": "공지 레포 보기"
+        },
+        "en": {
+          "text": "This is a test notice. It disappears on December 1.",
+          "actionTitle": "View notice repo"
+        }
+      }
+    }
+  ]
 }
