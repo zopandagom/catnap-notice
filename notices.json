@@ -1,22 +1,6 @@
 {
   "notices": [
     {
-      "id": "test-force-update-1.0.1",
-      "type": "forceUpdate",
-      "forceUpdateVersion": "1.0.1",
-      "appStoreURL": "https://apps.apple.com/kr/app/id6829718440",
-      "localizations": {
-        "ko": {
-          "text": "강제 업데이트 테스트예요. 버튼을 누르면 App Store 가 열려요. 이 항목을 지울 때까지 계속 떠요.",
-          "actionTitle": "업데이트"
-        },
-        "en": {
-          "text": "Force update test. Tap the button to open the App Store. This stays until the entry is removed.",
-          "actionTitle": "Update"
-        }
-      }
-    },
-    {
       "id": "test-2026-11-17-internal",
       "endsAt": "2026-12-01T00:00:00+09:00",
       "actionLink": "catnap-pandagom://internal-url=https%3A%2F%2Fgithub.com%2Fzopandagom%2Fcatnap-notice",
