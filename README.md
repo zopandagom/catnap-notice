@@ -102,7 +102,7 @@ CI 는 앱보다 엄격하다: 앱은 잘못된 공지를 조용히 빼지만, C
 | 키 | 필수 | 설명 |
 |---|---|---|
 | `forceUpdateVersion` | ✅ | 앱 버전이 이보다 **낮으면** 팝업을 띄운다. `1.2.3` 형식(`1.0` = `1.0.0`) |
-| `appStoreURL` | ✅ | 버튼을 누르면 앱 밖에서 여는 App Store 주소. `itms-apps://apps.apple.com/app/id<숫자>`(권장) 또는 `https://apps.apple.com/kr/app/<이름>/id<숫자>`. 쿼리·포트 없음 |
+| `appStoreURL` | ✅ | 버튼을 누르면 앱 밖에서 여는 App Store 주소. `itms-apps://apps.apple.com/app/id<숫자>` 또는 `https://apps.apple.com/kr/app/id<숫자>`(`/kr/app/<이름>/id<숫자>` 도 된다). 쿼리·포트 없음 |
 | `startsAt` · `endsAt` | | 일반 공지와 같다 |
 | `localizations` | ✅ | `ko`·`en` 필수. 블록에는 `text`(필수)·`actionTitle`(선택, 없으면 앱 기본 "업데이트")만 쓴다 |
 

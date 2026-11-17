@@ -42,7 +42,7 @@ REQUIRED_LANGUAGES = ["ko", "en"]  # ko: 앱이 마지막에 고르는 언어, e
 # 출시하면 여기에 넣는다: 그 뒤로는 App Store 에 아직 없는 버전으로 강제 업데이트를 걸 수 없다.
 APP_STORE_ID = ""
 LOOKUP_URL = "https://itunes.apple.com/lookup?id={id}&country=kr"
-APP_STORE_PATH = re.compile(r"^/(?:app|[a-z]{2}/app/[A-Za-z0-9%._~-]+)/id([0-9]+)$")
+APP_STORE_PATH = re.compile(r"^/(?:[a-z]{2}/)?app/(?:[A-Za-z0-9%._~-]+/)?id([0-9]+)$")
 
 errors: list[str] = []
 warnings: list[str] = []
