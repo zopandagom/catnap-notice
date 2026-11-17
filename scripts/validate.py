@@ -28,7 +28,7 @@ BLOCK_KEYS = {"text", "image", "imageDescription", "confirmTitle", "actionTitle"
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$")
 VERSION_PATTERN = re.compile(r"^\d+(\.\d+)*$")
 # 추가 버튼 링크: 이 접두어 뒤의 퍼센트 인코딩된 https 주소는 앱 안 브라우저, 그 밖은 앱 밖에서 연다.
-APP_SCHEME = "catnap"
+APP_SCHEME = "catnap-pandagom"
 INTERNAL_PREFIX = f"{APP_SCHEME}://internal-url="
 REQUIRED_LANGUAGES = ["ko", "en"]  # ko: 앱이 마지막에 고르는 언어, en: 지원하지 않는 언어 기기가 보는 언어
 
@@ -114,7 +114,7 @@ def check_image(where: str, value: str) -> None:
 
 
 def check_link(where: str, value) -> None:
-    """앱 규칙(냥자리 Core `LinkDestination`): `catnap://internal-url=<완전히 인코딩한 https 주소>` 는 앱 안 브라우저,
+    """앱 규칙(냥자리 Core `LinkDestination`): `catnap-pandagom://internal-url=<완전히 인코딩한 https 주소>` 는 앱 안 브라우저,
     https·itms-apps(host 있음)·mailto(주소 있음)는 앱 밖에서 연다. 그 밖은 앱이 팝업만 닫으므로 여기서 막는다."""
     if not non_empty(value):
         error(where, "비어 있지 않은 문자열이어야 합니다")
@@ -139,7 +139,7 @@ def check_link(where: str, value) -> None:
         if not url.path:
             error(where, f"mailto: 뒤에 메일 주소가 없습니다: {value!r}")
     else:
-        error(where, f"앱이 여는 링크는 catnap://internal-url=…·https·itms-apps·mailto 뿐입니다: {value!r}")
+        error(where, f"앱이 여는 링크는 catnap-pandagom://internal-url=…·https·itms-apps·mailto 뿐입니다: {value!r}")
 
 
 def check_block(where: str, block, has_link: bool) -> None:

@@ -3,7 +3,7 @@
     {
       "id": "test-2026-11-17-internal",
       "endsAt": "2026-12-01T00:00:00+09:00",
-      "actionLink": "catnap://internal-url=https%3A%2F%2Fgithub.com%2Fzopandagom%2Fcatnap-notice",
+      "actionLink": "catnap-pandagom://internal-url=https%3A%2F%2Fgithub.com%2Fzopandagom%2Fcatnap-notice",
       "localizations": {
         "ko": {
           "text": "앱 안 브라우저 링크 테스트예요. 아래 버튼을 누르면 앱 안에서 공지 레포가 열려요.",
