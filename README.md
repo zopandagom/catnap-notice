@@ -29,7 +29,7 @@ https://zopandagom.github.io/catnap-notice/notices.json
       "endsAt": "2026-12-31T00:00:00+09:00",
       "minAppVersion": "1.1",
       "maxAppVersion": "1.9.9",
-      "actionLink": "catnap://internal-url=https%3A%2F%2Fzopandagom.github.io%2Fcatnap-notice%2F",
+      "actionLink": "catnap-pandagom://internal-url=https%3A%2F%2Fzopandagom.github.io%2Fcatnap-notice%2F",
       "localizations": {
         "ko": {
           "text": "겨울 장 20개가 새로 열렸어요!",
@@ -61,14 +61,14 @@ https://zopandagom.github.io/catnap-notice/notices.json
 ## 링크 규칙 (`actionLink`)
 | 링크 | 앱 동작 |
 |---|---|
-| `catnap://internal-url=<퍼센트 인코딩한 https 주소>` | 디코딩한 주소를 앱 안 브라우저(Safari 화면)로 연다 |
+| `catnap-pandagom://internal-url=<퍼센트 인코딩한 https 주소>` | 디코딩한 주소를 앱 안 브라우저(Safari 화면)로 연다 |
 | `https://…` | 앱 밖 Safari 에서 연다 |
 | `itms-apps://…` | 앱 밖 App Store 에서 연다 |
 | `mailto:…` | 앱 밖 메일 작성 화면을 연다 |
-| 그 밖 (`http:`·`tel:`·`shortcuts:`·다른 앱 스킴, `internal-url=` 이 아닌 `catnap://` 등) | 열지 않고 팝업만 닫는다. CI 가 막는다 |
+| 그 밖 (`http:`·`tel:`·`shortcuts:`·다른 앱 스킴, `internal-url=` 이 아닌 `catnap-pandagom://` 등) | 열지 않고 팝업만 닫는다. CI 가 막는다 |
 
 - 앱 밖으로 여는 스킴을 셋으로 좁힌 것은 공지 파일이 외부 입력이라서다(사용자는 누르기 전에 어디로 가는지 모른다). 늘리려면 앱(냥자리 Core `LinkDestination`)과 이 검사를 함께 바꾼다.
-- 인코딩은 주소 전체를 퍼센트 인코딩한다(인코딩하지 않은 문자가 섞이면 앱이 열지 않는다): `python3 -c "from urllib.parse import quote; print('catnap://internal-url=' + quote('https://example.com/a?b=1', safe=''))"`
+- 인코딩은 주소 전체를 퍼센트 인코딩한다(인코딩하지 않은 문자가 섞이면 앱이 열지 않는다): `python3 -c "from urllib.parse import quote; print('catnap-pandagom://internal-url=' + quote('https://example.com/a?b=1', safe=''))"`
 - 링크에 사용자·기기 식별자를 덧붙이지 않는다.
 
 언어 블록:
