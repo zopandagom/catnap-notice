@@ -10,6 +10,7 @@ https://zopandagom.github.io/catnap-notice/notices.json
 - 공개 레포라 올린 내용과 기록을 누구나 볼 수 있다. `startsAt` 을 미래로 둔 공지도 레포에서는 미리 보이므로 공개해도 될 때 올린다.
 - `main` 에는 PR 로만 들어간다. PR 마다 CI(`validate`)가 형식을 검사하고, 통과해야 머지할 수 있다. 머지 뒤 Pages 배포까지 몇 분 걸린다.
 - 로컬 검사: `python3 scripts/validate.py`
+- 같은 Pages 에 App Store Connect 에 넣는 개인정보 처리방침(`privacy.html`)과 지원 페이지(`support.html`)도 있다 (한국어·영어). 앱의 데이터 처리(받는 대상, 기기 안 저장)를 바꾸면 `privacy.html` 도 함께 고친다. 이 두 파일은 CI 가 검사하지 않는다.
 
 ## 앱이 공지를 고르는 방식
 - 앱을 켤 때마다 `notices.json` 을 받아, 배열 순서대로 띄울 수 있는 첫 공지 **하나**를 띄운다.
